@@ -2,6 +2,15 @@
 
 Versions refer to the STM32 firmware; the host tools track it.
 
+## Unreleased (host tools only)
+
+- Fix: `pcap.py log` included the first, unsettled conversion in its summary
+  statistics. One such sample inflated the reported sd from ~40 ppm to
+  ~2500 ppm, and since `drift` was simply the last value minus the first, it
+  also reported a drift of several tenths of a pF across a run that was in fact
+  flat. The CSV still records every sample; only the statistics now skip the
+  first two, matching what `PCap04.collect()` already did.
+
 ## 3.3.0
 
 - Fix: the "PCAP04 firmware is loaded" flag was never cleared, so after a power

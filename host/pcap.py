@@ -128,11 +128,22 @@ def cmd_stream(a):
             print(row)
 
 
+# conversions to discard before taking statistics - see PCap04.collect()
+SETTLE_SAMPLES = 2
+
+
 def cmd_log(a):
     with open_dev(a) as dev:
         cal_ok = need_cal(dev)
         nch = 3 if dev.mode() == "f" else 6
         acc = [[] for _ in range(nch)]
+        # The first conversions after a restart are not settled (the very first
+        # often reads full scale), exactly as PCap04.collect() allows for.  They
+        # are still written to the CSV - the file is the raw record - but they
+        # are kept out of the statistics: a single unsettled sample inflates the
+        # reported sd by two orders of magnitude and, because `drift` was the
+        # last value minus the first, invented a drift that was not there.
+        settle = SETTLE_SAMPLES
         t_end = time.time() + a.seconds if a.seconds else None
         n_target = a.number or 0
         with open(a.path, "w", newline="") as fh:
@@ -154,9 +165,10 @@ def cmd_log(a):
                                   for i in range(nch)]
                                + ["%02X" % v for v in s.status]
                                + ["|".join(s.errors)])
-                    for i in range(nch):
-                        if not s.is_open(i):
-                            acc[i].append(s.channels[i])
+                    if n >= settle:
+                        for i in range(nch):
+                            if not s.is_open(i):
+                                acc[i].append(s.channels[i])
                     n += 1
                     if time.time() - t_report > 2.0:
                         t_report = time.time()
@@ -174,6 +186,9 @@ def cmd_log(a):
             except KeyboardInterrupt:
                 pass
         print("\n\nwrote %d samples to %s" % (n, a.path))
+        if n > settle:
+            print("  statistics below exclude the first %d (unsettled) sample%s; "
+                  "the CSV has every one" % (settle, "" if settle == 1 else "s"))
         for i in range(nch):
             v = acc[i]
             if len(v) < 3:
