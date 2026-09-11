@@ -16,9 +16,21 @@ MCU_CONTROL.kicad_sch      STM32G0B1, SWD, USB, console header
 USB_POWER.kicad_sch        USB-C input, protection, rails, U5 load switch
 PCAP04_Acquisition.lib     custom symbols
 PCAP04_Custom.pretty/      custom footprints
+sym-lib-table              symbol library table
+fp-lib-table               footprint library table
 3dmodels/                  3D models for the custom parts
-manufacturing/             gerbers, drill, assembly data
+manufacturing/
+  gerber/  drill/            bare-board fabrication
+  *_JLCPCB_BARE_BOARD_UPLOAD.zip   the same, zipped for upload
+  *_IPC-D-356.net            netlist for electrical test
+  assembly/                  KiCad BOM (all / fitted) and placement positions
+  jlcpcb_pcba/               ready-to-upload JLCPCB assembly packages
+    smt_only/                  49 SMT placements, no through-hole
+    j11_fitted/                the same plus the J11 power-select header
 ```
+
+A rendered schematic is at `../docs/schematic.pdf`, and board renders are in
+`../docs/images/`, so you can read the design without installing KiCad.
 
 ## Getting one made
 
@@ -27,6 +39,24 @@ JLCPCB, but the gerbers are standard.
 
 - 4 layers, 1.6 mm, HASL or ENIG both fine
 - the SMA edge connectors are C496550 (LCSC part number)
+
+For **bare boards**, upload `manufacturing/PCAP04_v1.5_100mm_C496550_JLCPCB_BARE_BOARD_UPLOAD.zip`
+and nothing else.
+
+For **assembled boards**, pick one of the two packages under
+`manufacturing/jlcpcb_pcba/` and follow the README inside it — each lists the
+exact BOM and CPL files to upload and what is deliberately left unfitted. Two
+things there are worth reading before you pay:
+
+- **U1 (PCAP04-AQFM-24, LCSC C2829318) is not normally in JLC's assembly
+  stock.** It has to be pre-ordered into My Parts Lib. No substitution is
+  acceptable.
+- **The SMA connectors J2–J7 are not assembled.** They are edge-mount parts;
+  solder them by hand. Same for the headers, except J11 in the `j11_fitted`
+  package.
+
+`assembly/` holds the plain KiCad exports (BOM and placement positions) if you
+want to feed a different assembler or hand-build.
 
 ## Layer stack and why it matters here
 

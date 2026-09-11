@@ -24,7 +24,9 @@ venv/
 # host tool state - board-specific, not for sharing
 host/pcap04_calibration.json
 host/pcap04_calibration_sim.json
-*.csv
+# measurement logs written by `pcap.py log` and the GUI.
+# (scoped to host/ on purpose - hardware/ BOM and CPL files are .csv and ARE tracked)
+host/**/*.csv
 *.log
 
 # os

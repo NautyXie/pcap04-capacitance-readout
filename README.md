@@ -32,13 +32,16 @@ not require re-uploading anything.
 ## Repository layout
 
 ```
-hardware/       KiCad 7 project, custom footprints, 3D models
-  manufacturing/  gerbers, drill, assembly data (JLCPCB-ready)
+hardware/       KiCad 7 project, custom symbols/footprints, 3D models
+  manufacturing/  gerbers, drill, IPC netlist
+    assembly/       BOM and placement positions
+    jlcpcb_pcba/    ready-to-upload JLCPCB assembly packages (BOM + CPL)
 firmware/       bare-metal STM32G0B1 firmware (no vendor HAL)
   prebuilt/       pcap04_diag.bin, ready to flash
 host/           Python library, CLI and GUI
   characterisation/  the sweeps that produced the numbers in docs/measurements.md
-docs/           design verification report, usage guide, measured results
+docs/           schematic PDF, design verification report, usage guide,
+                measured results
 ```
 
 ## Quick start
@@ -48,6 +51,12 @@ docs/           design verification report, usage guide, measured results
 `hardware/manufacturing/` contains gerbers, drill files and assembly data ready
 to upload. The board is 100 × 100 mm 4-layer; the design rules file is
 `hardware/*.kicad_dru`.
+
+For a bare board, upload `PCAP04_v1.5_100mm_C496550_JLCPCB_BARE_BOARD_UPLOAD.zip`.
+For an assembled one, use a package under `manufacturing/jlcpcb_pcba/` — but
+note that **the PCAP04 itself (LCSC C2829318) is not usually in JLC's assembly
+stock and has to be pre-ordered**, and the SMA connectors are hand-soldered.
+See [hardware/README.md](hardware/README.md).
 
 ### 2. Flash the firmware
 
@@ -150,6 +159,7 @@ Route these out if you respin.
 
 ## Documentation
 
+- [docs/schematic.pdf](docs/schematic.pdf) — rendered schematic, no KiCad needed
 - [docs/measurements.md](docs/measurements.md) — every measured figure, and how it was obtained
 - [docs/usage.zh.md](docs/usage.zh.md) — full usage guide (Chinese)
 - [docs/design-verification-report.pdf](docs/design-verification-report.pdf) — schematic and layout review against the datasheets

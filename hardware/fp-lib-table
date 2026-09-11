@@ -14,6 +14,5 @@
   (lib (name "Package_TO_SOT_SMD")(type "KiCad")(uri "${KICAD10_FOOTPRINT_DIR}/Package_TO_SOT_SMD.pretty")(options "")(descr "SOT packages"))
   (lib (name "Resistor_SMD")(type "KiCad")(uri "${KICAD10_FOOTPRINT_DIR}/Resistor_SMD.pretty")(options "")(descr "Resistor footprints"))
   (lib (name "Button_Switch_SMD")(type "KiCad")(uri "${KICAD10_FOOTPRINT_DIR}/Button_Switch_SMD.pretty")(options "")(descr "SMD buttons"))
-  (lib (name "PCAP04_Acquisition")(type "KiCad")(uri "${KIPRJMOD}/PCAP04_Acquisition.pretty")(options "")(descr "Project specific footprints"))
   (lib (name "PCAP04_Custom")(type "KiCad")(uri "${KIPRJMOD}/PCAP04_Custom.pretty")(options "")(descr "Corrected project footprints"))
 )
