@@ -1,0 +1,32 @@
+# KiCad
+*.kicad_prl
+*-backups/
+*.bak
+*.kicad_pcb-bak
+*.kicad_sch-bak
+fp-info-cache
+~*
+
+# firmware build output
+*.o
+*.elf
+*.map
+*.hex
+firmware/pcap04_diag.bin
+!firmware/prebuilt/*.bin
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# host tool state - board-specific, not for sharing
+host/pcap04_calibration.json
+host/pcap04_calibration_sim.json
+*.csv
+*.log
+
+# os
+.DS_Store
+Thumbs.db

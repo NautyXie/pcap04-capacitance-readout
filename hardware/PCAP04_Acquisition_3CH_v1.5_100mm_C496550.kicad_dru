@@ -1,0 +1,8 @@
+(version 1)
+
+# J1 is edge-mounted, so its two outline-adjacent silkscreen strokes are intentional.
+(rule "Allow USB-C connector silk at board edge"
+    (constraint silk_clearance)
+    (severity ignore)
+    (condition "(A.memberOfFootprint('J1') && B.Layer == 'Edge.Cuts') || (B.memberOfFootprint('J1') && A.Layer == 'Edge.Cuts')")
+)

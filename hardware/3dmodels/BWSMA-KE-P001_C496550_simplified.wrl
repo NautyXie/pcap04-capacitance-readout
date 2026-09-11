@@ -1,0 +1,62 @@
+#VRML V2.0 utf8
+
+# Simplified visual envelope for BAT WIRELESS BWSMA-KE-P001 / LCSC C496550.
+# KiCad legacy VRML scale: 1 unit = 2.54 mm. Fabrication geometry is defined
+# by the footprint pads and courtyard, not by this visualization-only model.
+
+DEF METAL Appearance {
+  material Material {
+    diffuseColor 0.72 0.72 0.68
+    specularColor 0.75 0.75 0.72
+    shininess 0.65
+  }
+}
+
+DEF GOLD Appearance {
+  material Material {
+    diffuseColor 0.82 0.57 0.12
+    specularColor 0.95 0.78 0.32
+    shininess 0.8
+  }
+}
+
+DEF PTFE Appearance {
+  material Material {
+    diffuseColor 0.93 0.93 0.88
+    specularColor 0.25 0.25 0.25
+    shininess 0.25
+  }
+}
+
+# 8.0 mm long, 6.35 mm diameter SMA body.
+Transform {
+  translation -2.992126 0 0.314961
+  rotation 0 0 1 -1.570796
+  children [ Shape { appearance USE METAL geometry Cylinder { radius 1.25 height 3.149606 } } ]
+}
+
+# 1.5 mm long, 6.5 mm diameter board-side collar.
+Transform {
+  translation -1.122047 0 0.314961
+  rotation 0 0 1 -1.570796
+  children [ Shape { appearance USE METAL geometry Cylinder { radius 1.279528 height 0.590551 } } ]
+}
+
+# Board-edge contact block following the -2.1 to +1.9 mm footprint envelope.
+Transform {
+  translation -0.039370 0 0.314961
+  children [ Shape { appearance USE METAL geometry Box { size 1.574803 2.362205 0.629921 } } ]
+}
+
+# Visible dielectric and centre contact.
+Transform {
+  translation -4.527559 0 0.314961
+  rotation 0 0 1 -1.570796
+  children [ Shape { appearance USE PTFE geometry Cylinder { radius 0.708661 height 0.157480 } } ]
+}
+
+Transform {
+  translation 0.393701 0 0.314961
+  rotation 0 0 1 -1.570796
+  children [ Shape { appearance USE GOLD geometry Cylinder { radius 0.118110 height 1.574803 } } ]
+}

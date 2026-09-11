@@ -1,0 +1,9 @@
+# console, CLI and GUI
+pyserial>=3.5
+
+# USB DFU flashing (pcapdfu.py) - pure Python, no dfu-util needed
+pyusb>=1.2
+libusb-package>=1.0 ; sys_platform != "linux"
+
+# SWD flashing (pcapflash.py) - optional, only if you use a CMSIS-DAP probe
+# pyocd>=0.36
