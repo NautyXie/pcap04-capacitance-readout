@@ -71,3 +71,17 @@ python3 pcap.py calib 100 -c 2 --sweep    # characterise all 31 reference codes
 
 Stored in `pcap04_calibration.json` (gitignored — it is specific to your board)
 and loaded automatically afterwards.
+
+## Full configuration editor
+
+The GUI **前端参数** button exposes 90 named user fields, including the
+10/180 kΩ charging resistor and precharge/full-charge timing. It reads the
+actual configuration, pauses acquisition, applies only edits with RUNBIT held
+low, verifies readback, and supports JSON snapshots. No firmware reflash is
+required. See [configuration controls](../docs/register-controls.md) for timing,
+protected fields, CLI/API examples and the hardware-validation boundary.
+
+```sh
+python3 pcap.py registers --list
+python3 pcap.py registers
+```

@@ -25,6 +25,8 @@ Channel numbering
 
 import argparse
 import csv
+import json
+from pcap_registers import FIELDS, RegisterError
 import math
 import statistics
 import sys
@@ -273,6 +275,22 @@ def cmd_config(a):
         print(dev.params()["raw"])
 
 
+def cmd_registers(a):
+    if a.list_fields:
+        for f in FIELDS.values():
+            print('%-24s 0..%-8d %s' % (f.name,f.maximum,f.help))
+        return
+    changes={}
+    for item in a.set or []:
+        name,value=item.split('=',1)
+        if name in changes: raise ValueError('Duplicate field: '+name)
+        changes[name]=int(value,0)
+    # Deliberately no open_dev(): inspecting registers must not load defaults.
+    with PCap04(port=a.port,verbose=a.verbose) as dev:
+        if changes: print(json.dumps(dev.write_fields(changes),indent=2))
+        else: print(json.dumps(dev.read_fields(),indent=2))
+
+
 def cmd_console(a):
     with open_dev(a) as dev:
         for line in a.command:
@@ -343,6 +361,11 @@ def main(argv=None):
     s.add_argument("--ports", help="C_PORT_EN bitmask, e.g. 0x3F")
     s.set_defaults(func=cmd_config)
 
+    s = sub.add_parser("registers", help="all user configuration fields; no implicit load")
+    s.add_argument("--list", dest="list_fields", action="store_true", help="list fields without hardware")
+    s.add_argument("--set", action="append", metavar="NAME=VALUE", help="repeat for a single validated batch")
+    s.set_defaults(func=cmd_registers)
+
     s = sub.add_parser("console", help="send raw firmware commands")
     s.add_argument("command", nargs="+")
     s.set_defaults(func=cmd_console)
@@ -350,7 +373,7 @@ def main(argv=None):
     a = p.parse_args(argv)
     try:
         a.func(a)
-    except PCapError as e:
+    except (PCapError, RegisterError, ValueError) as e:
         sys.exit("error: %s" % e)
     except KeyboardInterrupt:
         sys.exit(0)

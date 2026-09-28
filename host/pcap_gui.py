@@ -38,6 +38,9 @@ from pcap04 import (Sample, Calibration, PCapError, SPEED_PRESETS,   # noqa: E40
                     FLOATING_CHANNELS, GROUNDED_CHANNELS, C_AVRG_MAX,
                     F_OLF_HZ, Q527)
 
+from pcap_registers import RegisterAccess, FIELDS, decode
+from pcap_settings import SettingsDialog
+
 APP_TITLE = "PCAP04 电容读出  ·  Acquisition_3CH v1.5"
 COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#ff7f0e", "#9467bd", "#8c564b"]
 SPEED_LABELS = {"fast": "快速  C_AVRG=32  ~12.8 Hz",
@@ -50,7 +53,7 @@ WINDOWS = [("10 s", 10), ("30 s", 30), ("1 min", 60), ("5 min", 300), ("30 min",
 # simulator - the same interface the GUI uses on PCap04
 # ============================================================================
 
-class SimDevice:
+class SimDevice(RegisterAccess):
     """Behaves like the real board closely enough to exercise every control.
 
     Numbers come from the measured v1.5 board: Cref(N) ~ 0.975 N + 9.91 pF,
@@ -65,6 +68,7 @@ class SimDevice:
     CAL_PATH = Calibration.DEFAULT_PATH.replace(".json", "_sim.json")
 
     def __init__(self):
+        self._regs = dict.fromkeys(range(64), 0)
         self.powered = False
         self.loaded = False
         self._mode = "f"
@@ -92,7 +96,7 @@ class SimDevice:
         return 250.0 * math.sqrt(32.0 / max(1, self.avrg))
 
     def _period(self):
-        trig = 2.0 * self.conv / F_OLF_HZ
+        trig = max(1e-4, 2.0 * self.conv / F_OLF_HZ)
         busy = 0.00057 * self.avrg
         k = max(1, int(math.ceil(busy / trig)))
         return k * trig
@@ -118,9 +122,29 @@ class SimDevice:
     def close(self):
         pass
 
+    def _sync_registers(self):
+        for n,v in {'C_FLOATING':int(self._mode=='f'), 'C_REF_SEL':self.refsel,
+                    'C_AVRG':self.avrg, 'CONV_TIME':self.conv, 'C_COMP_INT':int(self.comp_int),
+                    'C_COMP_EXT':int(self.comp_ext), 'C_PORT_EN':self.ports}.items():
+            FIELDS[n].put(self._regs,v)
+
     def cmd(self, line, **kw):
-        time.sleep(0.05)
-        return "  (sim) %s" % line
+        parts=line.split()
+        if not self.powered: return 'ERR rail is off'
+        if parts[0]=='cfg':
+            self._sync_registers()
+            return '\n'.join('%02X: '%a+' '.join('%02X'%self._regs[i] for i in range(a,a+16)) for a in range(0,64,16))
+        if parts[0]=='wr':
+            a,v=[int(x,16) for x in parts[1:]]
+            self._regs[a]=v
+            p=decode(self._regs)
+            self._mode='f' if p['C_FLOATING'] else 'g'
+            self.refsel,self.avrg,self.conv=p['C_REF_SEL'],p['C_AVRG'],p['CONV_TIME']
+            self.comp_int,self.comp_ext,self.ports=p['C_COMP_INT'],p['C_COMP_EXT'],p['C_PORT_EN']
+            return 'cfg[0x%02X] <- 0x%02X, read back 0x%02X'%(a,v,v)
+        if parts[0] in ('init','start'):
+            return 'sent 0x'+('8A' if parts[0]=='init' else '8C')
+        return '  (sim) %s' % line
 
     def power(self, on=True):
         time.sleep(0.05)
@@ -141,6 +165,10 @@ class SimDevice:
         time.sleep(1.2)
         self._mode = mode[:1]
         self.loaded = True
+        self._register_stopped = False
+        self._regs = dict.fromkeys(range(64), 0)
+        for n,v in {"RUNBIT":1,"C_REF_INT":1,"DISCHARGE_TIME":8,"WD_DIS":0x5A,"PG5_INTN_EN":1,"C_TRIG_SEL":2,"OX_RUN":1,"OLF_CTUNE":1,"OLF_FTUNE":7}.items():
+            FIELDS[n].put(self._regs,v)
         self.refsel, self.avrg, self.conv = 31, 32, 2000     # load resets config
         self.comp_int, self.comp_ext, self.ports = True, self._mode == "f", 0x3F
         return ("  test read ... 0x11 OK\n  writing 548 bytes of standard firmware to SRAM ... verified\n"
@@ -159,6 +187,8 @@ class SimDevice:
                                  else "GROUNDED (6 electrodes -> RES0..RES5)")
 
     def _ensure_loaded(self):
+        if getattr(self,"_register_stopped",False):
+            raise PCapError("Configuration editor stopped the chip; explicitly load or set RUNBIT=1")
         if not self.loaded:
             self.load(self._mode)
 
@@ -170,7 +200,7 @@ class SimDevice:
     def set_conv(self, n):
         self._ensure_loaded(); time.sleep(0.08)
         self.conv = max(25, int(n))
-        return "  CONV_TIME = %d  -> nominal %.3f Hz" % (self.conv, F_OLF_HZ / (2 * self.conv))
+        return "  CONV_TIME = %d  -> nominal %.3f Hz" % (self.conv, F_OLF_HZ / (2 * max(1,self.conv)))
 
     def set_refsel(self, n):
         self._ensure_loaded(); time.sleep(0.08)
@@ -204,7 +234,7 @@ class SimDevice:
                % ("loaded" if self.loaded else "NOT loaded - run 'load'",
                   "FLOATING" if self._mode == "f" else "GROUNDED", self.refsel,
                   self.comp_int, self.comp_ext, self.ports, self.avrg, self.conv,
-                  F_OLF_HZ / (2 * self.conv), 1 if self.loaded else 0))
+                  F_OLF_HZ / (2 * max(1,self.conv)), 1 if self.loaded else 0))
         return {"raw": raw, "loaded": self.loaded, "mode": "FLOATING" if self._mode == "f" else "GROUNDED",
                 "refsel": self.refsel, "avrg": self.avrg, "conv_time": self.conv,
                 "port_en": self.ports, "comp_int": self.comp_int, "comp_ext": self.comp_ext,
@@ -276,6 +306,7 @@ class Worker(threading.Thread):
         self.cmds = queue.Queue()
         self.streaming = False
         self._announced = False
+        self.settle_samples = 0
         self._quit = threading.Event()
 
     def call(self, name, fn, *a, **kw):
@@ -315,7 +346,11 @@ class Worker(threading.Thread):
                         self.streaming = False
                         continue
                 try:
-                    self.events.put(("sample", next(gen)))
+                    sample = next(gen)
+                    if self.settle_samples:
+                        self.settle_samples -= 1
+                    else:
+                        self.events.put(("sample", sample))
                 except StopIteration:
                     gen = None
                 except Exception as e:                      # noqa: BLE001
@@ -735,12 +770,17 @@ class App(tk.Tk):
 
     # -- actions --------------------------------------------------------------------
     def _toggle_run(self):
+        if getattr(self,"settings_dialog",None): return
         if not self.worker:
             return
         if self.worker.streaming:
             self.worker.streaming = False
             self.btn_run.config(text="▶ 开始采集")
         else:
+            p = getattr(self, 'advanced_fields', None)
+            if p and (not p['RUNBIT'] or not p['PG5_INTN_EN'] or p['C_TRIG_SEL'] not in (0,2,3,7) or p['C_DIFFERENTIAL']):
+                messagebox.showinfo('采集配置', '当前配置不支持此GUI的连续普通通道显示：检查RUNBIT、PG5_INTN_EN、C_TRIG_SEL及C_DIFFERENTIAL。可继续在参数窗口调整。')
+                return
             self.rate_hist.clear()
             self.last_sample_t = None
             self.worker.streaming = True
@@ -813,42 +853,12 @@ class App(tk.Tk):
     def _dlg_settings(self):
         if not self.worker:
             messagebox.showinfo("设置", "先连接"); return
-        d = tk.Toplevel(self); d.title("前端参数"); d.transient(self); d.grab_set()
-        f = ttk.Frame(d, padding=12); f.pack()
-        p = self.dev.params() if isinstance(self.dev, SimDevice) else {}
-        rows = [("参考电容档 C_REF_SEL (0–31)", "refsel", p.get("refsel", 31)),
-                ("平均次数 C_AVRG (1–%d)" % C_AVRG_MAX, "avrg", p.get("avrg", 32)),
-                ("转换周期 CONV_TIME (周期 = 2·n / 51 kHz)", "conv", p.get("conv_time", 2000))]
-        vars_ = {}
-        for r, (lab, key, val) in enumerate(rows):
-            ttk.Label(f, text=lab).grid(row=r, column=0, sticky="w", pady=3)
-            v = tk.StringVar(value=str(val)); vars_[key] = v
-            ttk.Entry(f, textvariable=v, width=10).grid(row=r, column=1, padx=8)
-        vi, ve = tk.BooleanVar(value=p.get("comp_int", True)), tk.BooleanVar(value=p.get("comp_ext", True))
-        ttk.Checkbutton(f, text="片内补偿 C_COMP_INT", variable=vi).grid(row=3, column=0, sticky="w", pady=3)
-        ttk.Checkbutton(f, text="片外补偿 C_COMP_EXT（仅悬浮）", variable=ve).grid(row=4, column=0, sticky="w")
-        ttk.Label(f, text="端口使能 C_PORT_EN (hex)").grid(row=5, column=0, sticky="w", pady=3)
-        vp = tk.StringVar(value="0x%02X" % p.get("port_en", 0x3F)); ttk.Entry(f, textvariable=vp, width=10).grid(row=5, column=1)
-        ttk.Label(f, foreground="#607d8b", justify="left", wraplength=380,
-                  text="注意：C_AVRG ≥ 512 在本板会让读数偏低约 19.5 %，固件会拦在 256。"
-                       "改 C_REF_SEL 之后 pF 标定只对已标定过的档有效。").grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 4))
-
-        def apply():
-            try:
-                rs, av, cv = int(vars_["refsel"].get()), int(vars_["avrg"].get()), int(vars_["conv"].get())
-                pm = int(vp.get(), 0)
-            except ValueError:
-                messagebox.showwarning("设置", "请填整数"); return
-            dev = self.dev
-            def do():
-                out = [dev.set_refsel(rs), dev.set_avrg(av), dev.set_conv(cv),
-                       dev.set_comp(vi.get(), ve.get()), dev.set_ports(pm)]
-                return "\n".join(out)
-            self._call("settings", do)
-            d.destroy()
-        bb = ttk.Frame(f); bb.grid(row=7, column=0, columnspan=2, sticky="e")
-        ttk.Button(bb, text="取消", command=d.destroy).pack(side="right")
-        ttk.Button(bb, text="应用", command=apply).pack(side="right", padx=6)
+        if getattr(self, 'settings_dialog', None):
+            self.settings_dialog.lift(); return
+        self.worker.streaming = False
+        self.btn_run.config(text="▶ 开始采集")
+        self._stop_rec()
+        self.settings_dialog = SettingsDialog(self)
 
     def _dlg_calib(self):
         if not self.worker:
@@ -912,6 +922,8 @@ class App(tk.Tk):
                     self._on_result(ev[1], ev[2])
                 elif kind == "error":
                     self.busy = False
+                    if ev[1].startswith("register_") and getattr(self,"settings_dialog",None):
+                        self.settings_dialog.error(ev[2])
                     self.st_err.config(text=ev[2].splitlines()[0][:90])
                     self._logline("%s 失败: %s" % (ev[1], ev[2]), err=True)
                     self.st_state.config(text="已连接 %s" % (self.dev.port_name if self.dev else ""))
@@ -932,6 +944,17 @@ class App(tk.Tk):
     def _on_result(self, name, res):
         self.busy = False
         self.st_state.config(text="已连接 %s" % self.dev.port_name)
+        if name.startswith("register_"):
+            if getattr(self,"settings_dialog",None): self.settings_dialog.result(name,res)
+            self.advanced_fields = decode(res if name=="register_read" else res["registers"])
+            if name == "register_write":
+                self.worker.settle_samples = 2
+                self._refresh_calinfo()
+                self.chart.clear()
+                for c in self.cards: c.hist.clear()
+                self.worker.call("params",self.dev.params)
+                self._logline("配置已读回验证；开始新采集前请检查触发/INTN及标定。")
+            return
         if name == "rail":
             if res is not None:
                 self.lbl_rail.config(text="%.3f V" % (res / 1000.0),
@@ -955,6 +978,7 @@ class App(tk.Tk):
         if isinstance(res, str):
             self._logline(res)
         if name.startswith("mode") or name.startswith("load"):
+            self.advanced_fields = None
             m = name.split()[1]
             self.mode, self.nch = m, (3 if m == "f" else 6)
             self.var_mode.set(m)
@@ -980,6 +1004,10 @@ class App(tk.Tk):
                            % ("已载入" if loaded else "未载入", p.get("refsel", "?"), p.get("avrg", "?"),
                               p.get("conv_time", "?"), rate,
                               "✓" if p.get("comp_int") else "✗", "✓" if p.get("comp_ext") else "✗"))
+        advanced = getattr(self,"advanced_fields",None)
+        if advanced and (advanced["OLF_CTUNE"] != 1 or advanced["OLF_FTUNE"] != 7 or advanced["C_TRIG_SEL"] not in (2,3)):
+            self.st_cfg.config(text="自定义时钟/触发：CONV_TIME=%s；51 kHz 预设速率估计不适用。请查看实际采样率。" % p.get("conv_time","?"))
+            return
         for k, (a, c) in SPEED_PRESETS.items():
             if p.get("avrg") == a and p.get("conv_time") == c:
                 self.var_speed.set(SPEED_LABELS[k])

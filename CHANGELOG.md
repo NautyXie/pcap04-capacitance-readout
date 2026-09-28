@@ -73,3 +73,11 @@ Versions refer to the STM32 firmware; the host tools track it.
 
 - Board bring-up: clocks, power sequencing, ADC, SPI, USB DFU flashing,
   diagnostic console, self-test.
+
+## 2026-09-28 — Full runtime configuration controls
+
+- Add 90 datasheet-defined user fields shared by GUI, CLI and Python API.
+- Add charging-resistor, precharge and full-charge control; grouped editor and JSON snapshots.
+- Stop before masked writes, verify each byte and full readback, reject stale edits, and remain stopped on failure.
+- Preserve reserved/factory fields; exclude NVRAM operations. Existing MCU firmware supported.
+- Add protocol fault-injection tests and native Tk simulator smoke test; physical hardware untested.

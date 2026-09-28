@@ -38,6 +38,7 @@ import glob
 import json
 import os
 import re
+from pcap_registers import RegisterAccess
 import statistics
 import sys
 import time
@@ -254,7 +255,7 @@ class Calibration:
 # the board
 # ----------------------------------------------------------------------------
 
-class PCap04:
+class PCap04(RegisterAccess):
     PROMPT = b"> "
 
     def __init__(self, port=None, baud=115200, calibration="auto", verbose=False):
@@ -442,6 +443,7 @@ class PCap04:
             raise PCapError("load failed:\n" + out)
         self._mode = mode
         self._loaded = True
+        self._register_stopped = False
         return out
 
     def mode(self, m=None):
@@ -566,6 +568,8 @@ class PCap04:
         # Deliberately re-query rather than trusting the cached flag: the chip
         # can reset on its own (watchdog POR) with the host none the wiser.
         # params() now reports the chip's RUNBIT, not a stale firmware flag.
+        if getattr(self,"_register_stopped",False):
+            raise PCapError("Configuration editor stopped the chip; inspect configuration and explicitly load or set RUNBIT=1")
         if not self.params().get("loaded"):
             self.load(self._mode)
 
