@@ -58,7 +58,9 @@ pass `allow_stale=True` if you want to inspect them anyway.
 
 There is also an advisory lock on the serial port: two processes opening
 `/dev/cu.*` on macOS does not error, it just interleaves bytes and looks exactly
-like wedged hardware.
+like wedged hardware. Linux/macOS retain this `fcntl` file lock. On Windows,
+pyserial opens the serial port exclusively, so no `fcntl` module or lock file
+is needed; a second open fails with `serial.SerialException`.
 
 ## Calibration
 

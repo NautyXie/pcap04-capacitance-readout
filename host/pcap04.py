@@ -33,7 +33,6 @@ Three traps this module exists to keep you out of
 
 from __future__ import annotations
 
-import fcntl
 import glob
 import json
 import os
@@ -42,6 +41,11 @@ from pcap_registers import RegisterAccess
 import statistics
 import sys
 import time
+
+if os.name == "nt":
+    fcntl = None  # pyserial opens Windows serial ports with exclusive access.
+else:
+    import fcntl
 
 try:
     import serial
@@ -271,7 +275,11 @@ class PCap04(RegisterAccess):
         # advisory lock so the second one says what is really wrong.
         self._lock = self._take_lock(self.port_name)
         t0 = time.time()
-        self.ser = serial.Serial(self.port_name, baud, timeout=0.05)
+        try:
+            self.ser = serial.Serial(self.port_name, baud, timeout=0.05)
+        except Exception:
+            self.close()
+            raise
         self.open_seconds = time.time() - t0
         time.sleep(0.2)
         self.ser.reset_input_buffer()
@@ -303,6 +311,9 @@ class PCap04(RegisterAccess):
     # -- plumbing -------------------------------------------------------
     @staticmethod
     def _take_lock(port):
+        # Windows enforces exclusivity when serial.Serial opens the port.
+        if fcntl is None:
+            return None
         path = os.path.join("/tmp", "pcap04" + port.replace("/", "_") + ".lock")
         fh = open(path, "w")
         try:
@@ -391,10 +402,14 @@ class PCap04(RegisterAccess):
         try:
             lock = getattr(self, "_lock", None)
             if lock is not None:
-                fcntl.flock(lock, fcntl.LOCK_UN)
-                lock.close()
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_UN)
+                finally:
+                    lock.close()
         except Exception:
             pass
+        finally:
+            self._lock = None
 
     def __enter__(self):
         return self
